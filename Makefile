@@ -6,6 +6,9 @@ test:
 test-w:
 	./node_modules/.bin/mocha --watch --growl --reporter min spec
 
+lint:
+	node_modules/.bin/jshint index.js lib spec
+
 init-testing update-testing:
 	npm install
 
