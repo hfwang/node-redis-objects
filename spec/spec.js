@@ -55,6 +55,13 @@ beforeEach(function(done) {
   checkReady();
 });
 
+afterEach(function() {
+  if (client) {
+    client.quit();
+    client = null;
+  }
+});
+
 describe('node_redis works (smoke test)', function() {
   it('should connect', function(done) {
     async.series([
@@ -76,7 +83,7 @@ describe('node_redis works (smoke test)', function() {
   });
 });
 
-describe('Value stores single values', function() {
+describe('Value', function() {
   it('should read and write simple values', function(done) {
     var simpleValue = new redis_objects.Value('testKey');
     async.series([
@@ -113,45 +120,151 @@ describe('Value stores single values', function() {
     ], done);
   });
 
-  it('should marshal and unmarshal from JSON', function(done) {
-    var simpleValue = new redis_objects.Value('testKey', {marshal: true});
+  it('should support default values', function(done) {
+    var simpleValue, simpleValue2;
     async.series([
-      function(callback) {
-        simpleValue.setValue({foo: 'bar', bar: 1}, callback);
+      function(cb) {
+        client.set('testKey2', 'blah', cb());
       },
-      function(callback) {
-        simpleValue.getValue(function(e, res) {
-          res.should.eql({foo: 'bar', bar: 1});
-          callback(e, res);
+      function(cb) {
+        simpleValue = new redis_objects.Value('testKey', {default: 'bah'});
+        simpleValue2 = new redis_objects.Value('testKey2', {default: 'bah'});
+        cb();
+      },
+      function(cb) {
+        simpleValue.getValue(function(e, r) {
+          // Should use default value
+          r.should.eql('bah');
+          cb(e, r);
+        });
+      },
+      function (cb) {
+        simpleValue2.getValue(function(e, r) {
+          // Should use previously set value
+          r.should.eql('blah');
+          cb(e, r);
         });
       }
     ], done);
   });
 
-  it('should support custom marshallers', function(done) {
-    var marshaller = {
-      stringify: function(val) {
-        return "1" + JSON.stringify(val)+ "2";
-      },
-      parse: function(val) {
-        return JSON.parse(val.slice(1, -1));
-      }
-    };
-    var simpleValue = new redis_objects.Value('testKey', {marshal: marshaller});
+  describe('marshalling', function() {
+    it('should marshal and unmarshal from JSON', function(done) {
+      var simpleValue = new redis_objects.Value('testKey', {marshal: true});
+      async.series([
+        function(callback) {
+          simpleValue.setValue({foo: 'bar', bar: 1}, callback);
+        },
+        function(callback) {
+          simpleValue.getValue(function(e, res) {
+            res.should.eql({foo: 'bar', bar: 1});
+            callback(e, res);
+          });
+        }
+      ], done);
+    });
+
+    it('should support custom marshallers', function(done) {
+      var marshaller = {
+        stringify: function(val) {
+          return "1" + JSON.stringify(val)+ "2";
+        },
+        parse: function(val) {
+          return JSON.parse(val.slice(1, -1));
+        }
+      };
+      var simpleValue = new redis_objects.Value('testKey', {marshal: marshaller});
+      async.series([
+        function(callback) {
+          simpleValue.getValue(function(e, res) {
+            should.not.exist(res);
+            callback(e, res);
+          });
+        },
+        function(callback) {
+          simpleValue.setValue({foo: 'bar', bar: 1}, callback);
+        },
+        function(callback) {
+          simpleValue.getValue(function(e, res) {
+            res.should.eql({foo: 'bar', bar: 1});
+            callback(e, res);
+          });
+        }
+      ], done);
+    });
+  });
+});
+
+describe('Hash', function() {
+  it('should read and write simple values', function(done) {
+    var simpleValue = new redis_objects.Hash('testKey');
     async.series([
       function(callback) {
-        simpleValue.getValue(function(e, res) {
-          should.not.exist(res);
+        simpleValue.isEmpty(function(e, res) {
+          res.should.be.ok;
           callback(e, res);
         });
       },
       function(callback) {
-        simpleValue.setValue({foo: 'bar', bar: 1}, callback);
+        simpleValue.get('foo', function(e, res) {
+          assert.equal(res, undefined);
+          callback(e, res);
+        });
       },
       function(callback) {
-        simpleValue.getValue(function(e, res) {
-          res.should.eql({foo: 'bar', bar: 1});
+        simpleValue.include('foo', function(e, res) {
+          res.should.not.be.ok;
           callback(e, res);
+        });
+      },
+      function(callback) {
+        simpleValue.set('foo', 'NEW VALUE HERE', callback);
+      },
+      function(callback) {
+        simpleValue.get('foo', function(e, res) {
+          res.should.equal('NEW VALUE HERE');
+          callback(e, res);
+        });
+      },
+      function(callback) {
+        simpleValue.include('foo', function(e, res) {
+          res.should.be.ok;
+          callback(e, res);
+        });
+      },
+      function(callback) {
+        simpleValue.delete('foo', function(e) {
+          if (e) return callback(e);
+
+          simpleValue.include('foo', function(e, res) {
+            res.should.not.be.ok;
+            callback(e, res);
+          });
+        });
+      }
+    ], done);
+  });
+
+  it('should support marshaling', function(done) {
+    var jsonHash = new redis_objects.Hash('testKey', {marshal: true});
+    var keyedHash = new redis_objects.Hash('testKey2', {marshalKeys: {a: true, b: Number}});
+    async.series([
+      function(cb) {
+        jsonHash.store('a', {a: true, b: 1, c: 1}, cb);
+      },
+      function(cb) {
+        keyedHash.store('a', {a: true, b: 1, c: 1}, cb);
+      },
+      function(cb) {
+        jsonHash.all(function(e, r) {
+          r.should.eql({a: {a: true, b: 1, c: 1}});
+          cb();
+        });
+      },
+      function(cb) {
+        keyedHash.all(function(e, r) {
+          r.should.eql({a: {a: true, b: 1, c: 1}});
+          cb();
         });
       }
     ], done);
