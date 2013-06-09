@@ -204,42 +204,76 @@ describe('Hash', function() {
           res.should.be.ok;
           callback(e, res);
         });
-      },
-      function(callback) {
+      }, function(callback) {
         simpleValue.get('foo', function(e, res) {
           assert.equal(res, undefined);
           callback(e, res);
         });
-      },
-      function(callback) {
+      }, function(callback) {
         simpleValue.include('foo', function(e, res) {
           res.should.not.be.ok;
           callback(e, res);
         });
-      },
-      function(callback) {
+      }, function(callback) {
         simpleValue.set('foo', 'NEW VALUE HERE', callback);
-      },
-      function(callback) {
+      }, function(callback) {
         simpleValue.get('foo', function(e, res) {
           res.should.equal('NEW VALUE HERE');
           callback(e, res);
         });
-      },
-      function(callback) {
+      }, function(callback) {
         simpleValue.include('foo', function(e, res) {
           res.should.be.ok;
           callback(e, res);
         });
-      },
-      function(callback) {
-        simpleValue.delete('foo', function(e) {
-          if (e) return callback(e);
+      }, function(callback) {
+        simpleValue.fill({foo: 'ANOTHER VALUE', bar: 'ANOTHER VALUE'}, callback);
+      }, function(callback) {
+        simpleValue.size(function(e, res) {
+          res.should.equal(2);
+          callback(e, res);
+        });
+      }, function(callback) {
+        simpleValue.bulkSet({foo: 'VALUE', baz: 'FOO'}, callback);
+      }, function(callback) {
+        simpleValue.bulkGet(['foo', 'bar', 'baz'], function(e, res) {
+          res.should.eql({foo: 'VALUE', bar: 'ANOTHER VALUE', baz: 'FOO'});
+          callback(e, res);
+        });
+      }, function(callback) {
+        simpleValue.bulkValues(['foo', 'bar', 'baz'], function(e, res) {
+          res.should.eql(['VALUE', 'ANOTHER VALUE', 'FOO']);
+          callback(e, res);
+        });
+      }, function(callback) {
+        simpleValue.delete('foo', callback);
+      }, function(callback) {
+        simpleValue.include('foo', function(e, res) {
+          res.should.not.be.ok;
+          callback(e, res);
+        });
+      }
+    ], done);
+  });
 
-          simpleValue.include('foo', function(e, res) {
-            res.should.not.be.ok;
-            callback(e, res);
-          });
+  it('should support incrementing', function(done) {
+    var hash = new redis_objects.Hash('key', {marshal: 'Integer'});
+
+    async.series([
+      function(cb) {
+        hash.incr('foo', function(e, res) {
+          res.should.equal(1);
+          cb(e, res);
+        });
+      }, function(cb) {
+        hash.get('foo', function(e, res) {
+          res.should.equal(1);
+          cb(e, res);
+        });
+      }, function(cb) {
+        hash.incrby('foo', 200, function(e, res) {
+          res.should.equal(201);
+          cb(e, res);
         });
       }
     ], done);
