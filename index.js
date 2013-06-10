@@ -14,3 +14,4 @@ exports.connect = function(connection) {
 exports.BaseObject = require('./lib/BaseObject');
 exports.Value = require('./lib/Value');
 exports.Hash = require('./lib/Hash');
+exports.SortedSet = require('./lib/SortedSet');

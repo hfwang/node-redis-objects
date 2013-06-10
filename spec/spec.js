@@ -305,6 +305,47 @@ describe('Hash', function() {
   });
 });
 
+describe('SortedSet', function() {
+  it('should read and write simple values', function(done) {
+    var key = new redis_objects.SortedSet('testKey');
+    async.series([
+      function(callback) {
+        key.put('foo', 1, function(e, res) {
+          res.should.equal(1);
+          callback(e, res);
+        });
+      }, function(callback) {
+        key.put('foo', 2, function(e, res) {
+          res.should.equal(0);
+          callback(e, res);
+        });
+      }, function(callback) {
+        key.incr('bar', 4, function(e, res) {
+          res.should.equal(4);
+          callback(e, res);
+        });
+      }, function(callback) {
+        key.revRange(0, 1, function(e, res) {
+          res.should.eql(['bar']);
+          callback(e, res);
+        });
+      }, function(callback) {
+        key.range(0, 1, {withScores: true}, function(e, res) {
+          res.should.eql([['foo', 2]]);
+          callback(e, res);
+        });
+      }, function(callback) {
+        key.delete('foo', callback);
+      }, function(callback) {
+        key.length(function(e, res) {
+          res.should.equal(1);
+          callback(e, res);
+        });
+      }
+    ], done);
+  });
+});
+
 process.on('exit', function() {
   if (redisProcess) {
     redisProcess.kill();
