@@ -335,6 +335,21 @@ describe('SortedSet', function() {
           callback(e, res);
         });
       }, function(callback) {
+        key.score('foo', function(e, res) {
+          res.should.equal(2);
+          callback(e, res);
+        });
+      }, function(callback) {
+        key.rank('foo', function(e, res) {
+          res.should.equal(0);
+          callback(e, res);
+        });
+      }, function(callback) {
+        key.revrank('foo', function(e, res) {
+          res.should.equal(1);
+          callback(e, res);
+        });
+      }, function(callback) {
         key.delete('foo', callback);
       }, function(callback) {
         key.length(function(e, res) {
