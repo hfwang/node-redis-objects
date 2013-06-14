@@ -285,19 +285,28 @@ describe('Hash', function() {
     async.series([
       function(cb) {
         jsonHash.store('a', {a: true, b: 1, c: 1}, cb);
-      },
-      function(cb) {
+      }, function(cb) {
         keyedHash.store('a', {a: true, b: 1, c: 1}, cb);
-      },
-      function(cb) {
+      }, function(cb) {
         jsonHash.all(function(e, r) {
           r.should.eql({a: {a: true, b: 1, c: 1}});
           cb();
         });
-      },
-      function(cb) {
+      }, function(cb) {
         keyedHash.all(function(e, r) {
           r.should.eql({a: {a: true, b: 1, c: 1}});
+          cb();
+        });
+      }, function(cb) {
+        keyedHash.bulkSet({b: 1, c: 2}, cb);
+      }, function(cb) {
+        keyedHash.bulkValues(['b', 'c'], function(e, r) {
+          r.should.eql([1, '2']);
+          cb();
+        });
+      }, function(cb) {
+        keyedHash.bulkGet(['b', 'c'], function(e, r) {
+          r.should.eql({b: 1, c: '2'});
           cb();
         });
       }
