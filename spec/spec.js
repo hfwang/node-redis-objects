@@ -279,38 +279,67 @@ describe('Hash', function() {
     ], done);
   });
 
-  it('should support marshaling', function(done) {
-    var jsonHash = new redis_objects.Hash('testKey', {marshal: true});
-    var keyedHash = new redis_objects.Hash('testKey2', {marshalKeys: {a: true, b: Number}});
-    async.series([
-      function(cb) {
-        jsonHash.store('a', {a: true, b: 1, c: 1}, cb);
-      }, function(cb) {
-        keyedHash.store('a', {a: true, b: 1, c: 1}, cb);
-      }, function(cb) {
-        jsonHash.all(function(e, r) {
-          r.should.eql({a: {a: true, b: 1, c: 1}});
-          cb();
-        });
-      }, function(cb) {
-        keyedHash.all(function(e, r) {
-          r.should.eql({a: {a: true, b: 1, c: 1}});
-          cb();
-        });
-      }, function(cb) {
-        keyedHash.bulkSet({b: 1, c: 2}, cb);
-      }, function(cb) {
-        keyedHash.bulkValues(['b', 'c'], function(e, r) {
-          r.should.eql([1, '2']);
-          cb();
-        });
-      }, function(cb) {
-        keyedHash.bulkGet(['b', 'c'], function(e, r) {
-          r.should.eql({b: 1, c: '2'});
-          cb();
-        });
-      }
-    ], done);
+  describe('marshalling', function() {
+    it('should support marshaling', function(done) {
+      var jsonHash = new redis_objects.Hash('testKey', {marshal: true});
+      var keyedHash = new redis_objects.Hash('testKey2', {marshalKeys: {a: true, b: Number}});
+      async.series([
+        function(cb) {
+          jsonHash.store('a', {a: true, b: 1, c: 1}, cb);
+        }, function(cb) {
+          keyedHash.store('a', {a: true, b: 1, c: 1}, cb);
+        }, function(cb) {
+          jsonHash.all(function(e, r) {
+            r.should.eql({a: {a: true, b: 1, c: 1}});
+            cb();
+          });
+        }, function(cb) {
+          keyedHash.all(function(e, r) {
+            r.should.eql({a: {a: true, b: 1, c: 1}});
+            cb();
+          });
+        }, function(cb) {
+          keyedHash.bulkSet({b: 1, c: 2}, cb);
+        }, function(cb) {
+          keyedHash.bulkValues(['b', 'c'], function(e, r) {
+            r.should.eql([1, '2']);
+            cb();
+          });
+        }, function(cb) {
+          keyedHash.bulkGet(['b', 'c'], function(e, r) {
+            r.should.eql({b: 1, c: '2'});
+            cb();
+          });
+        }
+      ], done);
+    });
+
+    it('should support marshalled keys', function(done) {
+      var hash = new redis_objects.Hash('testKey', {keyMarshaller: true});
+
+      async.series([
+        function(cb) {
+          hash.store([1], 'a', cb);
+        }, function(cb) {
+          hash.get([1], function(e, res) {
+            res.should.equal('a');
+            cb(e, res);
+          });
+        }, function(cb) {
+          hash.hasKey([1], function(e, res) {
+            res.should.equal(1);
+            cb(e, res);
+          });
+        }, function(cb) {
+          hash.delete([1], cb);
+        }, function(cb) {
+          hash.hasKey([1], function(e, res) {
+            res.should.equal(0);
+            cb(e, res);
+          });
+        }
+      ], done);
+    });
   });
 });
 
