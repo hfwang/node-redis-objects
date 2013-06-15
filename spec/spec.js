@@ -1,5 +1,6 @@
 /* jshint expr: true */
 
+require('longjohn');
 var redis_objects = require('../index');
 var _ = require('underscore');
 var async = require('async');
@@ -11,19 +12,56 @@ var assert = require("assert");
 var redisProcess = null;
 var client = null;
 
-function shouldBeOk(cb) {
-  return function(e, res) {
-    res.should.be.ok;
-    cb(e, res);
-  };
-}
+_.each({
+  shouldBeOk: function() {
+    var cb = this, error = new Error();
 
-function shouldNotBeOk(cb) {
-  return function(e, res) {
-    res.should.not.be.ok;
-    cb(e, res);
-  };
-}
+    return function(e, res) {
+      try {
+        res.should.be.ok;
+        cb(e, res);
+      } catch(err) {
+        error.message = err.message;
+        throw error;
+      }
+    };
+  },
+
+  shouldNotBeOk: function() {
+    var cb = this, error = new Error();
+
+    return function(e, res) {
+      try {
+        res.should.not.be.ok;
+        cb(e, res);
+      } catch(err) {
+        error.message = err.message;
+        throw error;
+      }
+    };
+  }
+}, function(getter, key) {
+  Object.defineProperty(Function.prototype, key, { get: getter });
+});
+
+_.each({
+  shouldEql: function(val) {
+    var cb = this;
+    return function(e, res) {
+      res.should.eql(val);
+      cb(e, res);
+    };
+  },
+  shouldEqual: function(val) {
+    var cb = this;
+    return function(e, res) {
+      res.should.equal(val);
+      cb(e, res);
+    };
+  },
+}, function(value, key) {
+  Object.defineProperty(Function.prototype, key, { value: value });
+});
 
 before(function() {
   redisProcess = child_process.exec(
@@ -69,10 +107,16 @@ beforeEach(function(done) {
   checkReady();
 });
 
-afterEach(function() {
+afterEach(function(done) {
   if (client) {
-    client.quit();
-    client = null;
+    async.series([
+      client.flushdb.bind(client),
+      client.quit.bind(client),
+      function(cb) {
+        client = null;
+        cb(undefined);
+      }
+    ], done);
   }
 });
 
@@ -203,6 +247,126 @@ describe('Value', function() {
             res.should.eql({foo: 'bar', bar: 1});
             callback(e, res);
           });
+        }
+      ], done);
+    });
+  });
+
+  describe('BaseObject-based behaviour', function() {
+    it('can inspect', function() {
+      var value = new redis_objects.Value('testKey');
+      value.inspect().should.equal('#<Value key: testKey>');
+    });
+
+    it('basic existance checks', function(done) {
+      var value = new redis_objects.Value('testKey');
+
+      async.series([
+        function(cb) {
+          value.type(function(e, res) {
+            res.should.equal('none');
+            cb(e, res);
+          });
+        }, function(cb) {
+          value.exists(cb.shouldNotBeOk);
+        }, function(cb) {
+          value.set('foo', cb);
+        }, function(cb) {
+          value.exists(cb.shouldBeOk);
+        }, function(cb) {
+          value.type(cb.shouldEql('string'));
+        }, function(cb) {
+          value.clear(cb);
+        }, function(cb) {
+          value.exists(cb.shouldNotBeOk);
+        }
+      ], done);
+    });
+
+    it('key expiry', function(done) {
+      var value = new redis_objects.Value('keyForExpiryTest');
+      var future = 2524629600; // 2050/01/01 00:00:00
+      async.series([
+        function(cb) {
+          value.set('foo', cb);
+        }, function(cb) {
+          value.ttl(cb.shouldEql(-1));
+        }, function(cb) {
+          value.expire(10000, cb);
+        }, function(cb) {
+          value.expireAt(future, cb.shouldBeOk);
+        }, function(cb) {
+          // Sometime in the future, this is basically just ensuring its greater
+          // than 0
+          value.ttl(cb.shouldBeOk);
+        }, function(cb) {
+          value.persist(cb);
+        }, function(cb) {
+          value.ttl(cb.shouldEql(-1));
+        }
+      ], done);
+    });
+
+    it('key rename (no exist)', function(done) {
+      var value = new redis_objects.Value('key1');
+      var existingValue = new redis_objects.Value('keyExists');
+
+      async.series([
+        value.set.bind(value, 'a'),
+        existingValue.set.bind(existingValue, '123'),
+        function(cb) {
+          value.renamenx('key2', true, cb.shouldBeOk);
+        }, function(cb) {
+          value.key.should.eql('key2');
+          cb();
+        }, function(cb) {
+          value.renamenx('keyExists', cb.shouldNotBeOk);
+        }, function(cb) {
+          value.key.should.eql('key2');
+          cb();
+        }, function(cb) {
+          value.renamenx('key3', false, cb.shouldBeOk);
+        }, function(cb) {
+          value.key.should.eql('key2');
+          value.key = 'key3';
+          value.renamenx('key4', cb.shouldBeOk);
+        }, function(cb) {
+          value.key.should.eql('key4');
+          cb();
+        }, function(cb) {
+          value.renamenx(existingValue, cb.shouldNotBeOk);
+        }
+      ], done);
+    });
+
+    it('key rename', function(done) {
+      var value = new redis_objects.Value('key1');
+      var existingValue = new redis_objects.Value('keyExists');
+
+      async.series([
+        value.set.bind(value, 'a'),
+        existingValue.set.bind(existingValue, '123'),
+        function(cb) {
+          value.rename('key2', true, cb.shouldBeOk);
+        }, function(cb) {
+          value.key.should.eql('key2');
+          cb();
+        }, function(cb) {
+          value.rename('keyExists', cb.shouldBeOk);
+        }, function(cb) {
+          value.key.should.eql('keyExists');
+          cb();
+        }, function(cb) {
+          value.rename('key3', false, cb.shouldBeOk);
+        }, function(cb) {
+          value.key.should.eql('keyExists');
+          value.key = 'key3';
+          value.rename('key4', cb.shouldBeOk);
+        }, function(cb) {
+          value.key.should.eql('key4');
+          cb();
+        }, function(cb) {
+          value.rename(existingValue, cb.shouldBeOk);
         }
       ], done);
     });
@@ -423,11 +587,11 @@ describe('Set', function() {
           cb(e, res);
         });
       }, function(cb) {
-        key.empty(shouldBeOk(cb));
+        key.empty(cb.shouldBeOk);
       }, function(cb) {
         key.add('a', cb);
       }, function(cb) {
-        key.isMember('a', shouldBeOk(cb));
+        key.isMember('a', cb.shouldBeOk);
       }, function(cb) {
         key.pop(function(e, res) {
           res.should.equal('a');
