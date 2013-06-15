@@ -11,6 +11,20 @@ var assert = require("assert");
 var redisProcess = null;
 var client = null;
 
+function shouldBeOk(cb) {
+  return function(e, res) {
+    res.should.be.ok;
+    cb(e, res);
+  };
+}
+
+function shouldNotBeOk(cb) {
+  return function(e, res) {
+    res.should.not.be.ok;
+    cb(e, res);
+  };
+}
+
 before(function() {
   redisProcess = child_process.exec(
     'redis-server redis.conf',
@@ -393,6 +407,53 @@ describe('SortedSet', function() {
         key.length(function(e, res) {
           res.should.equal(1);
           callback(e, res);
+        });
+      }
+    ], done);
+  });
+});
+
+describe('Set', function() {
+  it('should read and write simple values', function(done) {
+    var key = new redis_objects.Set('testKey');
+    async.series([
+      function(cb) {
+        key.members(function(e, res) {
+          res.should.eql([]);
+          cb(e, res);
+        });
+      }, function(cb) {
+        key.empty(shouldBeOk(cb));
+      }, function(cb) {
+        key.add('a', cb);
+      }, function(cb) {
+        key.isMember('a', shouldBeOk(cb));
+      }, function(cb) {
+        key.pop(function(e, res) {
+          res.should.equal('a');
+          cb(e, res);
+        });
+      }, function(cb) {
+        key.merge(['a', 'b', 'c'], cb);
+      }, function(cb) {
+        key.members(function(e, res) {
+          res.sort().should.eql(['a', 'b', 'c']);
+          cb(e, res);
+        });
+      }, function(cb) {
+        key.delete('b', function(e, res) {
+          res.should.equal(1);
+          cb(e, res);
+        });
+      }, function(cb) {
+        key.delete('b', function(e, res) {
+          res.should.equal(0);
+          cb(e, res);
+        });
+      }, function(cb) {
+        key.length(function(e, res) {
+          res.should.equal(2);
+          cb(e, res);
         });
       }
     ], done);

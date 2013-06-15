@@ -12,6 +12,7 @@ exports.connect = function(connection) {
   return privateConnection;
 };
 exports.BaseObject = require('./lib/BaseObject');
-exports.Value = require('./lib/Value');
 exports.Hash = require('./lib/Hash');
+exports.Set = require('./lib/Set');
 exports.SortedSet = require('./lib/SortedSet');
+exports.Value = require('./lib/Value');
