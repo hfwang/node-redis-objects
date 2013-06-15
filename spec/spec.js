@@ -46,22 +46,45 @@ _.each({
 
 _.each({
   shouldEql: function(val) {
-    var cb = this;
+    var cb = this, error = new Error();
+
     return function(e, res) {
-      res.should.eql(val);
-      cb(e, res);
+      try {
+        res.should.eql(val);
+        cb(e, res);
+      } catch(err) {
+        error.message = err.message;
+        throw error;
+      }
     };
   },
   shouldEqual: function(val) {
-    var cb = this;
+    var cb = this, error = new Error();
+
     return function(e, res) {
-      res.should.equal(val);
-      cb(e, res);
+      try {
+        res.should.equal(val);
+        cb(e, res);
+      } catch(err) {
+        error.message = err.message;
+        throw error;
+      }
     };
   },
 }, function(value, key) {
   Object.defineProperty(Function.prototype, key, { value: value });
 });
+
+// This is a wacky marshaller which produces a string representation quite
+// different from the number's toString
+var wackyMarshaller = {
+  parse: function(str) {
+    return parseInt(str, 10) - 1;
+  },
+  stringify: function(num) {
+    return (num + 1).toString();
+  }
+};
 
 before(function() {
   redisProcess = child_process.exec(
@@ -620,6 +643,89 @@ describe('Set', function() {
           cb(e, res);
         });
       }
+    ], done);
+  });
+});
+
+describe('List', function() {
+  it('should read and write simple values', function(done) {
+    var key = new redis_objects.List('testKey');
+
+    async.series([
+      function(cb) {
+        key.empty(cb.shouldBeOk);
+      }, function(cb) {
+        key.push('c', cb.shouldBeOk);
+      }, function(cb) {
+        key.insert('BEFORE', 'c', 'b', cb.shouldBeOk);
+      }, function(cb) {
+        key.values(cb.shouldEql(['b', 'c']));
+      }, function(cb) {
+        key.range(0, -1, cb.shouldEql(['b']));
+      }, function(cb) {
+        key.push('d', cb.shouldBeOk);
+      }, function(cb) {
+        key.unshift('a', cb.shouldBeOk);
+      }, function(cb) {
+        key.range(0, cb.shouldEql(['a', 'b', 'c', 'd']));
+      }, function(cb) {
+        key.pop(cb.shouldEqual('d'));
+      }, function(cb) {
+        key.shift(cb.shouldEqual('a'));
+      }, function(cb) {
+        key.unshiftAll(['a', 'a', 'a', 'a'], cb.shouldEqual(6));
+      }, function(cb) {
+        key.delete('a', 2, cb.shouldEqual(2));
+      }, function(cb) {
+        key.setAt(1, '0', cb.shouldBeOk);
+      }, function(cb) {
+        key.values(cb.shouldEql(['a', '0', 'b', 'c']));
+      }, function(cb) {
+        key.first(cb.shouldEqual('a'));
+      }, function(cb) {
+        key.last(cb.shouldEqual('c'));
+      }, function(cb) {
+        key.length(cb.shouldEqual(4));
+      }, function(cb) {
+        key.at(1, cb.shouldEqual('0'));
+      }, function(cb) {
+        key.pushAll(['d', 'e'], cb);
+      }, function(cb) {
+        key.values(cb.shouldEql(['a', '0', 'b', 'c', 'd', 'e']));
+      }
+    ], done);
+  });
+
+  it('can be used as a fixed length buffer', function(done) {
+    var key = new redis_objects.List('testKey', {maxLength: 3, marshal: wackyMarshaller});
+
+    async.series([
+      function(cb) {
+        key.push(1, cb);
+      }, function(cb) {
+        // 4 elements are pushed on, (5 total) and the callback will return the
+        // normal result...
+        key.unshiftAll([-3, -2, -1, 0].reverse(), cb.shouldEqual(5));
+      }, function(cb) {
+        // But it will then be trimmed.
+        key.values(cb.shouldEql([-1, 0, 1]));
+      }, function(cb) {
+        key.push(2, cb);
+      }, function(cb) {
+        key.values(cb.shouldEql([0, 1, 2]));
+      }
+    ], done);
+  });
+
+  it('supports marshaling', function(done) {
+    var key = new redis_objects.List('testKey', {marshal: wackyMarshaller});
+
+    async.series([
+      key.pushAll.bind(key, [0, 0, 1, 1, 2, 2]),
+      key.delete.bind(key, 1),
+      function(cb) {
+        key.values(cb.shouldEql([0, 0, 2, 2]));
+      },
     ], done);
   });
 });
