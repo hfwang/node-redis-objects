@@ -528,6 +528,8 @@ describe('Hash', function() {
       var keyedHash = new redis_objects.Hash('testKey2', {marshalKeys: {a: true, b: Number}});
       async.series([
         function(cb) {
+          jsonHash.all(cb.shouldEql({}));
+        }, function(cb) {
           jsonHash.store('a', {a: true, b: 1, c: 1}, cb);
         }, function(cb) {
           keyedHash.store('a', {a: true, b: 1, c: 1}, cb);
@@ -617,53 +619,64 @@ describe('SortedSet', function() {
   it('should read and write simple values', function(done) {
     var key = new redis_objects.SortedSet('testKey');
     async.series([
-      function(callback) {
-        key.put('foo', 1, function(e, res) {
-          res.should.equal(1);
-          callback(e, res);
-        });
-      }, function(callback) {
-        key.put('foo', 2, function(e, res) {
-          res.should.equal(0);
-          callback(e, res);
-        });
-      }, function(callback) {
-        key.incr('bar', 4, function(e, res) {
-          res.should.equal(4);
-          callback(e, res);
-        });
-      }, function(callback) {
-        key.revRange(0, 1, function(e, res) {
-          res.should.eql(['bar']);
-          callback(e, res);
-        });
-      }, function(callback) {
-        key.range(0, 1, {withScores: true}, function(e, res) {
-          res.should.eql([['foo', 2]]);
-          callback(e, res);
-        });
-      }, function(callback) {
-        key.score('foo', function(e, res) {
-          res.should.equal(2);
-          callback(e, res);
-        });
-      }, function(callback) {
-        key.rank('foo', function(e, res) {
-          res.should.equal(0);
-          callback(e, res);
-        });
-      }, function(callback) {
-        key.revrank('foo', function(e, res) {
-          res.should.equal(1);
-          callback(e, res);
-        });
-      }, function(callback) {
-        key.delete('foo', callback);
-      }, function(callback) {
-        key.length(function(e, res) {
-          res.should.equal(1);
-          callback(e, res);
-        });
+      function(cb) {
+        key.empty(cb.shouldBeOk);
+      }, function(cb) {
+        key.put('foo', 1, cb.shouldEqual(1));
+      }, function(cb) {
+        key.member('foo', cb.shouldBeOk);
+      }, function(cb) {
+        key.put('foo', 2, cb.shouldEqual(0));
+      }, function(cb) {
+        key.incr('bar', 6, cb.shouldEql(6));
+      }, function(cb) {
+        key.incr('bar', cb.shouldEql(7));
+      }, function(cb) {
+        key.decr('bar', 2, cb.shouldEql(5));
+      }, function(cb) {
+        key.decr('bar', cb.shouldEql(4));
+      }, function(cb) {
+        key.revRange(0, 1, cb.shouldEql(['bar']));
+      }, function(cb) {
+        key.range(0, 1, {withScores: true}, cb.shouldEql([['foo', 2]]));
+      }, function(cb) {
+        key.score('foo', cb.shouldEqual(2));
+      }, function(cb) {
+        key.rank('foo', cb.shouldEqual(0));
+      }, function(cb) {
+        key.revrank('foo', cb.shouldEqual(1));
+      }, function(cb) {
+        key.delete('foo', cb);
+      }, function(cb) {
+        key.length(cb.shouldEqual(1));
+      }, function(cb) {
+        key.members(cb.shouldEql(['bar']));
+      }, function(cb) {
+        key.addAll({a : 1, b: 2}, cb);
+      }, function(cb) {
+        key.addAll([['c', 3], ['e', 5]], cb);
+      }, function(cb) {
+        key.rangeSize(1, 3, cb.shouldEqual(3));
+      }, function(cb) {
+        key.rangeByScore(2, 4, cb.shouldEql(['b', 'c', 'bar']));
+      }, function(cb) {
+        key.rangeByScore(2, 4, {count: 1}, cb.shouldEql(['b']));
+      }, function(cb) {
+        key.rangeByScore(2, 4, {offset: 1}, cb.shouldEql(['c', 'bar']));
+      }, function(cb) {
+        key.rangeByScore(2, 4, {limit: 1, offset: 1, withScores: true}, cb.shouldEql([['c', 3]]));
+      }, function(cb) {
+        key.first(cb.shouldEql('a'));
+      }, function(cb) {
+        key.last(cb.shouldEql('e'));
+      }, function(cb) {
+        key.remRangeByRank(-1, -1, cb.shouldEql(1));
+      }, function(cb) {
+        key.last(cb.shouldEql('bar'));
+      }, function(cb) {
+        key.remRangeByScore(1, '(4', cb);
+      }, function(cb) {
+        key.last(cb.shouldEql('bar'));
       }
     ], done);
   });
