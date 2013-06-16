@@ -457,6 +457,48 @@ describe('Hash', function() {
     ], done);
   });
 
+  it('should support bulk update and fill with objects', function(done) {
+    var hash = new redis_objects.Hash('testKey', {marshal: wackyMarshaller});
+
+    async.series([
+      hash.bulkSet.bind(hash, {a: 1, b: 2, c: 3}),
+      hash.fill.bind(hash, {c: 1, d: 4, e: 5}),
+      function(cb) {
+        hash.all(function(e, res) {
+          res.should.eql({
+            a: 1,
+            b: 2,
+            c: 3,
+            d: 4,
+            e: 5
+          });
+          cb(e, res);
+        });
+      }
+    ], done);
+  });
+
+  it('should support bulk update and fill with pairs', function(done) {
+    var hash = new redis_objects.Hash('testKey', {marshal: wackyMarshaller});
+
+    async.series([
+      hash.bulkSet.bind(hash, [['a', 1], ['b', 2], ['c', 3]]),
+      hash.fill.bind(hash, [['c', 1], ['d', 4], ['e', 5]]),
+      function(cb) {
+        hash.all(function(e, res) {
+          res.should.eql({
+            a: 1,
+            b: 2,
+            c: 3,
+            d: 4,
+            e: 5
+          });
+          cb(e, res);
+        });
+      }
+    ], done);
+  });
+
   it('should support incrementing', function(done) {
     var hash = new redis_objects.Hash('key', {marshal: 'Integer'});
 
@@ -510,6 +552,33 @@ describe('Hash', function() {
           keyedHash.bulkGet(['b', 'c'], function(e, r) {
             r.should.eql({b: 1, c: '2'});
             cb();
+          });
+        }
+      ], done);
+    });
+
+    it('should handle wackyMarshaller', function(done) {
+      var hash = new redis_objects.Hash('testKey', {marshal: wackyMarshaller});
+
+      async.series([
+        function(cb) {
+          hash.bulkSet([
+            ['a', 1],
+            ['b', 2],
+            ['c', 3]
+          ], cb.shouldBeOk);
+        }, function(cb) {
+          hash.get('a', cb.shouldEql(1));
+        }, function(cb) {
+          hash.values(function(e, res) {
+            res.sort().should.eql([1, 2, 3]);
+            cb(e, res);
+          });
+        }, function(cb) {
+          hash.keys(function(e, res) {
+            // Keys are not numbers, that's for keyMarshaller.
+            res.sort().should.eql(['a', 'b', 'c']);
+            cb(e, res);
           });
         }
       ], done);
