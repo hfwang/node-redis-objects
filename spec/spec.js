@@ -616,6 +616,22 @@ describe('Hash', function() {
 });
 
 describe('SortedSet', function() {
+  it('should handle missing elements', function(done) {
+    var key = new redis_objects.SortedSet('testKey');
+
+    async.series([
+      function(cb) {
+        key.empty(cb.shouldBeOk);
+      },
+      function(cb) {
+        key.score('foo', function(e, res) {
+          should.not.exist(res);
+          cb(e, res);
+        });
+      }
+    ], done);
+  });
+
   it('should read and write simple values', function(done) {
     var key = new redis_objects.SortedSet('testKey');
     async.series([
