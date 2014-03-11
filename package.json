@@ -35,5 +35,10 @@
   "repository": {
     "type": "git",
     "url": "git://github.com/hfwang/node-redis-objects.git"
-  }
+  },
+  "license": "MIT",
+  "bugs": {
+    "url": "https://github.com/hfwang/node-redis-objects/issues"
+  },
+  "homepage": "https://github.com/hfwang/node-redis-objects"
 }
