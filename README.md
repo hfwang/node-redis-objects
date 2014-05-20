@@ -6,7 +6,7 @@
 
 [npm]: https://www.npmjs.org/package/redis-objects
 [travis]: https://travis-ci.org/hfwang/node-redis-objects
-[license]: https://github.com/hfwang/ar_protobuf_store/blob/master/LICENSE.txt
+[license]: https://github.com/hfwang/node-redis-objects/blob/master/LICENSE
 
 A nodejs reimagining of the [redis-objects ruby gem](https://github.com/nateware/redis-objects),
 acting as an object-oriented bridge between redis and node.
